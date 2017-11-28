@@ -4,8 +4,10 @@ from pysc2.lib import actions
 class ActionEnum(Enum):
   NoOp = actions.FUNCTIONS.no_op.id
 
+  MoveCamera = actions.FUNCTIONS.move_camera.id
   SelectPoint = actions.FUNCTIONS.select_point.id
   SelectArmy = actions.FUNCTIONS.select_army.id
+  SelectIdleSCV = actions.FUNCTIONS.select_idle_worker.id
 
   TrainSCV = actions.FUNCTIONS.Train_SCV_quick.id
   TrainMarine = actions.FUNCTIONS.Train_Marine_quick.id

@@ -45,13 +45,13 @@ class ScriptedBuildAgent(base_agent.BaseAgent):
     self.obs = None
 
     # Scripted decisions are a function of (minerals, food/food_cap, worker#, army#, barrack#)
-    self.minerals, self.num_barracks, self.food_used, self.food_cap, self.worker_count, self.army_count = 0, 0, 0, 0, 0, 0
+    self.idle_worker, self.minerals, self.num_barracks, \
+    self.food_used, self.food_cap, self.worker_count, \
+    self.army_count = 0, 0, 0, 0, 0, 0, 0
 
     # flags for state, restructure this
-    self.selected_cc = False
-    self.selected_scv = False
-    self.selected_barracks = False
-    self.selected_marine = False
+    self.selected_cc, self.selected_scv, self.selected_barracks, self.selected_marine, \
+    self.camera_on_base = False, False, False, False, False
 
     # Build order is implemented as a stack
     # We push to top when we decide to pursue a strategy
@@ -98,6 +98,33 @@ class ScriptedBuildAgent(base_agent.BaseAgent):
 
     return False
 
+  # This is where all buildings and scvs are
+  def MoveCameraToBase(self):
+    actions = self.GetAvailableActions()
+
+    function_id = ActionEnum.NoOp.value
+    args = []
+    if ActionEnum.MoveCamera.value in actions and not self.camera_on_base:
+      function_id = ActionEnum.MoveCamera.value
+      args = [[self.player_x, self.player_y]]
+      self.camera_on_base = True
+
+    return False, function_id, args
+  # This is where the bulk of marines are
+  def MoveCameraToMarines(self):
+    actions = self.GetAvailableActions()
+
+    function_id = ActionEnum.NoOp.value
+    args = []
+    if ActionEnum.MoveCamera.value in actions and self.camera_on_base:
+      marines_x, marines_y = self.FindUnitLocationOnScreen(UnitEnum.TERRAN_MARINE.value)
+      if len(marines_x) > 0 and len(marines_y) > 0:
+        function_id = ActionEnum.MoveCamera.value
+        args = [[int(marines_x.mean()), int(marines_y.mean())]]
+        self.camera_on_base = False
+
+    return False, function_id, args
+
   # build order functions
   # build structures
   # These functions are implemented recursively
@@ -106,6 +133,9 @@ class ScriptedBuildAgent(base_agent.BaseAgent):
   def BOBuildSupplyDepot(self):
     function_id = ActionEnum.NoOp.value
     args = []
+
+    if not self.camera_on_base:
+      return self.MoveCameraToBase()
 
     if self.SCVSelected():
       self.selected_scv = True
@@ -143,8 +173,11 @@ class ScriptedBuildAgent(base_agent.BaseAgent):
     function_id = ActionEnum.NoOp.value
     args = []
 
+    if not self.camera_on_base:
+      return self.MoveCameraToBase()
+
     # check if supply depot exist
-    y, x = self.FindUnitLocationOnScreen(UnitEnum.TERRAN_SUPPLYDEPOT.value)
+    x, y = self.FindUnitLocationOnScreen(UnitEnum.TERRAN_SUPPLYDEPOT.value)
     if len(y) <= 0 or len(x) <= 0:
       return self.BOBuildSupplyDepot()
 
@@ -184,6 +217,9 @@ class ScriptedBuildAgent(base_agent.BaseAgent):
     function_id = ActionEnum.NoOp.value
     args = []
 
+    if self.camera_on_base:
+      return self.MoveCameraToMarines()
+
     actions = self.GetAvailableActions()
     if self.MarineSelected():
       self.selected_marine = True
@@ -205,40 +241,44 @@ class ScriptedBuildAgent(base_agent.BaseAgent):
       args = [_NOT_QUEUED, self.FindEnemyLocationOnMap()]
 
     return True, function_id, args
+  def HarvestWithSCV(self):
+    function_id = ActionEnum.NoOp.value
+    args = []
 
-  # If we are able to see enemies on explored part of minimap, send marines there,
-  # otherwise explore from our list of locations
-  def FindEnemyLocationOnMap(self):
-    enemy_y, enemy_x = (self.GetFeaturesLayer('minimap', features.SCREEN_FEATURES.player_relative.index) == _PLAYER_HOSTILE).nonzero()
-    if enemy_x.any() and enemy_y.any():
-      return [enemy_x.mean(), enemy_y.mean()]
+    if self.SCVSelected():
+      self.selected_scv = True
 
-    return self.locations_to_explore[self.next_location]
+    actions = self.GetAvailableActions()
 
-  def FindFreeBlockOnMap(self, radius):
-    unit_type_screen_feature = self.GetFeaturesLayer('screen', features.SCREEN_FEATURES.unit_type.index)
-    for pivot_y in range(radius, _MAP_RESOLUTION-radius):
-      for pivot_x in range(radius, _MAP_RESOLUTION-radius):
-        pivot_x, pivot_y = numpy.random.randint(radius, _MAP_RESOLUTION-radius, size=2)
-        sub_matrix = unit_type_screen_feature[pivot_y-radius:pivot_y+radius, pivot_x-radius:pivot_x+radius]
-        if (sub_matrix == UnitEnum.INVALID.value).all():
-          return pivot_x, pivot_y
+    if not self.selected_scv:
+      if ActionEnum.SelectIdleSCV.value in actions:
+        function_id = ActionEnum.SelectIdleSCV.value
+        args = [_NOT_QUEUED]
+        self.camera_on_base = False
+      elif self.idle_worker < 2:
+        return True, function_id, args
+    else:
+      if not self.SCVSelected():
+        self.selected_scv = False
+        return False, function_id, args
+      else:
+        for minerals in [UnitEnum.NEUTRAL_BATTLESTATIONMINERALFIELD.value, UnitEnum.NEUTRAL_BATTLESTATIONMINERALFIELD750.value, UnitEnum.NEUTRAL_LABMINERALFIELD.value, UnitEnum.NEUTRAL_LABMINERALFIELD750.value, UnitEnum.NEUTRAL_MINERALFIELD.value, UnitEnum.NEUTRAL_MINERALFIELD750.value, UnitEnum.NEUTRAL_PURIFIERMINERALFIELD.value, UnitEnum.NEUTRAL_PURIFIERMINERALFIELD750.value, UnitEnum.NEUTRAL_PURIFIERRICHMINERALFIELD.value, UnitEnum.NEUTRAL_PURIFIERRICHMINERALFIELD750.value, UnitEnum.NEUTRAL_RICHMINERALFIELD.value, UnitEnum.NEUTRAL_RICHMINERALFIELD750.value]:
+          mineral_x, mineral_y = self.FindUnitLocationOnScreen(minerals)
+          if len(mineral_x) > 1 and len(mineral_y) > 1:
+            index = numpy.random.randint(0, len(mineral_x))
+            function_id = ActionEnum.Harvest.value
+            args = [_NOT_QUEUED, [mineral_x[index], mineral_y[index]]]
+            return True, function_id, args
 
-    self.Log('ERROR, could not find a free block of radius: ' + str(radius))
-    return None
-  def FindUnitLocationOnScreen(self, unit_enum):
-    unit_type_screen_feature = self.GetFeaturesLayer('screen', features.SCREEN_FEATURES.unit_type.index)
-    indices = (unit_type_screen_feature == unit_enum).nonzero()
-    return [indices[1], indices[0]]
-  def FindUnitLocationOnMiniMap(self, unit_enum):
-    unit_type_screen_feature = self.GetFeaturesLayer('minimap', features.SCREEN_FEATURES.player_relative.index)
-    indices = (unit_type_screen_feature == unit_enum).nonzero()
-    return [indices[1], indices[0]]
+    return False, function_id, args
 
   # build units
   def BOBuildSCV(self):
     function_id = ActionEnum.NoOp.value
     args = []
+
+    if not self.camera_on_base:
+      return self.MoveCameraToBase()
 
     if self.CCSelected():
       self.selected_cc = True
@@ -268,8 +308,11 @@ class ScriptedBuildAgent(base_agent.BaseAgent):
 
     return False, function_id, args
   def BOBuildMarine(self):
+    if not self.camera_on_base:
+      return self.MoveCameraToBase()
+
     # check if barracks exist
-    y, x = self.FindUnitLocationOnScreen(UnitEnum.TERRAN_BARRACKS.value)
+    x, y = self.FindUnitLocationOnScreen(UnitEnum.TERRAN_BARRACKS.value)
     if len(y) <= 0 or len(x) <= 0:
       return self.BOBuildBarracks()
 
@@ -303,6 +346,35 @@ class ScriptedBuildAgent(base_agent.BaseAgent):
       return True, function_id, args
 
     return False, function_id, args
+
+  # If we are able to see enemies on explored part of minimap, send marines there,
+  # otherwise explore from our list of locations
+  def FindEnemyLocationOnMap(self):
+    enemy_y, enemy_x = (self.GetFeaturesLayer('minimap', features.SCREEN_FEATURES.player_relative.index) == _PLAYER_HOSTILE).nonzero()
+    if enemy_x.any() and enemy_y.any():
+      return [enemy_x.mean(), enemy_y.mean()]
+
+    return self.locations_to_explore[self.next_location]
+
+  def FindFreeBlockOnMap(self, radius):
+    unit_type_screen_feature = self.GetFeaturesLayer('screen', features.SCREEN_FEATURES.unit_type.index)
+    for pivot_y in range(radius, _MAP_RESOLUTION-radius):
+      for pivot_x in range(radius, _MAP_RESOLUTION-radius):
+        pivot_x, pivot_y = numpy.random.randint(radius, _MAP_RESOLUTION-radius, size=2)
+        sub_matrix = unit_type_screen_feature[pivot_y-radius:pivot_y+radius, pivot_x-radius:pivot_x+radius]
+        if (sub_matrix == UnitEnum.INVALID.value).all():
+          return pivot_x, pivot_y
+
+    self.Log('ERROR, could not find a free block of radius: ' + str(radius))
+    return None
+  def FindUnitLocationOnScreen(self, unit_enum):
+    unit_type_screen_feature = self.GetFeaturesLayer('screen', features.SCREEN_FEATURES.unit_type.index)
+    indices = (unit_type_screen_feature == unit_enum).nonzero()
+    return [indices[1], indices[0]]
+  def FindUnitLocationOnMiniMap(self, unit_enum):
+    unit_type_screen_feature = self.GetFeaturesLayer('minimap', features.SCREEN_FEATURES.player_relative.index)
+    indices = (unit_type_screen_feature == unit_enum).nonzero()
+    return [indices[1], indices[0]]
 
   def GetAvailableActions(self):
     return self.obs.observation['available_actions']
@@ -338,14 +410,19 @@ class ScriptedBuildAgent(base_agent.BaseAgent):
         self.num_barracks += 1
 
       # (4) keep building marines
-      if self.num_barracks > 0 and self.food_used + 2 < self.food_cap and self.minerals > _MARINE_MINERALS and ScriptedBuildAgent.BOBuildMarine not in self.next_build_step:
+      if self.num_barracks > 0 and self.food_used + 2 < self.food_cap and self.minerals > 3 * _MARINE_MINERALS and ScriptedBuildAgent.BOBuildMarine not in self.next_build_step:
         self.next_build_step.insert(0, ScriptedBuildAgent.BOBuildMarine)
 
       # (5) if you have 30+ marines, take them and attack
       if self.army_count > _MIN_MARINES_BEFORE_ATTACK and ScriptedBuildAgent.AttackWithMarine not in self.next_build_step:
         self.next_build_step.insert(0, ScriptedBuildAgent.AttackWithMarine)
 
+      # (0) if more than one SCV idle, rally it back to minerals
+      if self.idle_worker > 1 and ScriptedBuildAgent.HarvestWithSCV not in self.next_build_step:
+        self.next_build_step.insert(0, ScriptedBuildAgent.HarvestWithSCV)
+
     return self.next_build_step[0]
+
   def RemoveBuildStep(self):
     if len(self.next_build_step) > 1:
       self.next_build_step.pop(0)
@@ -360,6 +437,12 @@ class ScriptedBuildAgent(base_agent.BaseAgent):
 
     self.UpdateCounts()
 
+    # (0, 0) is top left of the mini map
+    if not self.player_y or not self.player_x:
+      player_y, player_x = (self.GetFeaturesLayer('minimap', features.SCREEN_FEATURES.player_relative.index) == _PLAYER_SELF).nonzero()
+      self.player_y, self.player_x = int(player_y.mean()), int(player_x.mean())
+      self.Log('x_mean: ' + str(self.player_x) + ' y_mean: ' + str(self.player_y))
+
     next_build_step = self.GetNextBuildStep()
     if not next_build_step:
       return actions.FunctionCall(function_id, args)
@@ -370,12 +453,6 @@ class ScriptedBuildAgent(base_agent.BaseAgent):
     if success:
       self.RemoveBuildStep()
       self.Log('Working on ' + str(self.GetNextBuildStep()))
-
-    # (0, 0) is top left of the mini map
-    if not self.player_y or not self.player_x:
-      player_y, player_x = (self.GetFeaturesLayer('minimap', features.SCREEN_FEATURES.player_relative.index) == _PLAYER_SELF).nonzero()
-      self.player_y, self.player_x = player_y.mean(), player_x.mean()
-      self.Log('x_mean: ' + str(self.player_x) + ' y_mean: ' + str(self.player_y))
 
     if self.steps % _STEPS_BEFORE_MARINE_RETARGET == 0:
       self.locations_to_explore.pop(self.next_location)
@@ -403,6 +480,7 @@ class ScriptedBuildAgent(base_agent.BaseAgent):
     self.food_used = player_layer[3]
     self.food_cap = player_layer[4]
     self.worker_count = player_layer[6]
+    self.idle_worker = player_layer[7]
     self.army_count = player_layer[8]
 
     # self.Log('Pop: ' + str(self.food_used) + ' PopLimit: ' + str(self.food_cap) + ' Ratio: ' + str(self.food_used/self.food_cap) + ' SCV: ' + str(self.worker_count) + ' Army: ' + str(self.army_count))
