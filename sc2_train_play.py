@@ -1,21 +1,16 @@
 import importlib
 import threading
 
-from future.builtins import range
-
 from pysc2 import maps
-from pysc2.env import available_actions_printer
-from pysc2.env import run_loop
-from pysc2.env import sc2_env
+from pysc2.env import available_actions_printer, run_loop, sc2_env
 from pysc2.lib import stopwatch
 
-from absl import app
-from absl import flags
+from absl import app, flags
 
 FLAGS = flags.FLAGS
-flags.DEFINE_integer("screen_resolution", 64,
+flags.DEFINE_integer("screen_resolution", 128,
                      "Resolution for screen feature layers.")
-flags.DEFINE_integer("minimap_resolution", 64,
+flags.DEFINE_integer("minimap_resolution", 128,
                      "Resolution for minimap feature layers.")
 
 flags.DEFINE_integer("max_agent_steps", 1000000, "Total agent steps.")

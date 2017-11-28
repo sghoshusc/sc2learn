@@ -5,6 +5,7 @@ class ActionEnum(Enum):
   NoOp = actions.FUNCTIONS.no_op.id
 
   SelectPoint = actions.FUNCTIONS.select_point.id
+  SelectArmy = actions.FUNCTIONS.select_army.id
 
   TrainSCV = actions.FUNCTIONS.Train_SCV_quick.id
   TrainMarine = actions.FUNCTIONS.Train_Marine_quick.id
@@ -12,10 +13,10 @@ class ActionEnum(Enum):
   BuildSupplyDepot = actions.FUNCTIONS.Build_SupplyDepot_screen.id
   BuildBarracks = actions.FUNCTIONS.Build_Barracks_screen.id
   BuildRefinery = actions.FUNCTIONS.Build_Refinery_screen.id
-  BuildEngineeringBay = actions.FUNCTIONS.Build_EngineeringBay_screen.id
 
   RallyWorkers = actions.FUNCTIONS.Rally_Workers_screen.id
   Harvest = actions.FUNCTIONS.Harvest_Gather_screen.id
+  Attack = actions.FUNCTIONS.Attack_minimap.id
   Cancel = actions.FUNCTIONS.Cancel_quick.id
 
 class UnitEnum(Enum):

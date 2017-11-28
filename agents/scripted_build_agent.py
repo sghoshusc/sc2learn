@@ -7,9 +7,11 @@ from enums.sc2_enums import *
 
 import time
 
-_SUPPLY_DEPOT_RADIUS = 5
-_BARRACKS_RADIUS = 7
-_EBAY_RADIUS = 7
+_SUPPLY_DEPOT_RADIUS = 3
+_BARRACKS_RADIUS = 5
+
+_PLAYER_SELF = 1
+_PLAYER_HOSTILE = 4
 
 class ScriptedBuildAgent(base_agent.BaseAgent):
   def __init__(self):
@@ -17,118 +19,17 @@ class ScriptedBuildAgent(base_agent.BaseAgent):
     self.last_possible_actions = None
     self.obs = None
 
-    self.build_order = [ScriptedBuildAgent.BOBuildSCV,
-                        ScriptedBuildAgent.BOBuildSupplyDepot,
-                        ScriptedBuildAgent.BOBuildSCV,
-                        ScriptedBuildAgent.BOBuildSCV,
-                        ScriptedBuildAgent.BOBuildSCV,
-                        ScriptedBuildAgent.BOBuildSCV,
-                        ScriptedBuildAgent.BOBuildBarracks,
-                        ScriptedBuildAgent.BOBuildSCV,
-                        ScriptedBuildAgent.BOBuildSCV,
-                        ScriptedBuildAgent.BOBuildSCV,
-                        ScriptedBuildAgent.BOBuildSCV,
-                        ScriptedBuildAgent.BOBuildSCV,
-                        ScriptedBuildAgent.BOBuildSCV,
-                        ScriptedBuildAgent.BOBuildSCV,
-                        ScriptedBuildAgent.BOBuildSCV,
-                        ScriptedBuildAgent.BOBuildSupplyDepot,
-                        ScriptedBuildAgent.BOBuildSCV,
-                        ScriptedBuildAgent.BOBuildSCV,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildSCV,
-                        ScriptedBuildAgent.BOBuildSCV,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildSupplyDepot,
-                        ScriptedBuildAgent.BOBuildBarracks,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildEBay,
-                        ScriptedBuildAgent.BOBuildSupplyDepot,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildBarracks,
-                        ScriptedBuildAgent.BOBuildSupplyDepot,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildSupplyDepot,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildSupplyDepot,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        ScriptedBuildAgent.BOBuildMarine,
-                        None
-                        ]
-    self.rem_build_steps = 0
+    self.minerals, self.num_barracks, self.food_used, self.food_cap, self.worker_count, self.army_count = 0, 0, 0, 0, 0, 0
 
     # flags for state, restructure this
     self.selected_cc = False
     self.selected_scv = False
     self.selected_barracks = False
+    self.selected_marine = False
+
+    self.next_build_step = [None]
+
+    self.player_x, self.player_y = None, None
 
   def CCSelected(self):
     actions = self.GetAvailableActions()
@@ -145,6 +46,12 @@ class ScriptedBuildAgent(base_agent.BaseAgent):
   def SCVSelected(self):
     actions = self.GetAvailableActions()
     if ActionEnum.Harvest.value in actions and ActionEnum.Cancel.value not in actions:
+      return True
+
+    return False
+  def MarineSelected(self):
+    actions = self.GetAvailableActions()
+    if ActionEnum.Attack.value in actions and self.obs.observation['single_select'][0][0] != UnitEnum.TERRAN_SCV.value:
       return True
 
     return False
@@ -228,48 +135,30 @@ class ScriptedBuildAgent(base_agent.BaseAgent):
       return True, function_id, args
 
     return False, function_id, args
-  def BOBuildEBay(self):
+  def AttackWithMarine(self):
     function_id = ActionEnum.NoOp.value
     args = []
 
-    if self.SCVSelected():
-      self.selected_scv = True
-
-    if not self.selected_scv:
-      scv_indices = self.FindUnitLocationOnScreen(UnitEnum.TERRAN_SCV.value)
-      if len(scv_indices) <= 0 or len(scv_indices[0]) <= 0 or len(scv_indices[1]) <= 0:
-        # TODO check if need to move screen
-        return False, function_id, args
-
-      picked_scv_index = numpy.random.randint(len(scv_indices[0]))
-      args = [[0], [scv_indices[0][picked_scv_index], scv_indices[1][picked_scv_index]]]
-
-      function_id = ActionEnum.SelectPoint.value
-
-      self.selected_scv = True
+    if not self.selected_marine:
+      function_id = ActionEnum.SelectArmy.value
+      args = [[0]]
+      self.selected_marine = True
       return False, function_id, args
     else:
-      actions = self.GetAvailableActions()
-      if ActionEnum.BuildEngineeringBay.value not in actions:
-        self.selected_scv = False
+      if not self.MarineSelected():
+        self.selected_marine = False
         return False, function_id, args
 
-      free_loc = self.FindFreeBlockOnMap(_EBAY_RADIUS)
-      if not free_loc:
-        return False, function_id, args
+      function_id = ActionEnum.Attack.value
+      args = [[0], [128 - self.player_x, 128 - self.player_y]]
 
-      function_id = ActionEnum.BuildEngineeringBay.value
-      args = [[0], free_loc]
-
-      return True, function_id, args
-
-    return False, function_id, args
+    return True, function_id, args
 
   def FindFreeBlockOnMap(self, radius):
     unit_type_screen_feature = self.GetFeaturesLayer('screen', features.SCREEN_FEATURES.unit_type.index)
-    for pivot_y in range(radius, 64-radius):
-      for pivot_x in range(radius, 64-radius):
-        pivot_x, pivot_y = numpy.random.randint(radius, 64-radius, size=2)
+    for pivot_y in range(radius, 128-radius):
+      for pivot_x in range(radius, 128-radius):
+        pivot_x, pivot_y = numpy.random.randint(radius, 128-radius, size=2)
         sub_matrix = unit_type_screen_feature[pivot_y-radius:pivot_y+radius, pivot_x-radius:pivot_x+radius]
         if (sub_matrix == UnitEnum.INVALID.value).all():
           return pivot_x, pivot_y
@@ -367,40 +256,86 @@ class ScriptedBuildAgent(base_agent.BaseAgent):
     print(self.LogPrefix() + line)
 
   def GetNextBuildStep(self):
-    if len(self.build_order) <= 0:
-      return None
+    if len(self.next_build_step) <= 1:
+      # empty, check what we should do next, rules:
 
-    return self.build_order[0]
+      # (1) if population nearing cap, build supply depot
+      if self.food_used / self.food_cap > 0.8 and self.minerals > 100 and ScriptedBuildAgent.BOBuildSupplyDepot not in self.next_build_step:
+        self.next_build_step.insert(0, ScriptedBuildAgent.BOBuildSupplyDepot)
+
+      # (2) macro up to 25 SCVs
+      if self.worker_count < 25 and self.food_used + 2 < self.food_cap and self.minerals > 50 and ScriptedBuildAgent.BOBuildSCV not in self.next_build_step:
+        self.next_build_step.insert(0, ScriptedBuildAgent.BOBuildSCV)
+
+      # (3) if floating minerals, build another barrack upto 7
+      if self.num_barracks < 7 and self.minerals > 150 and ScriptedBuildAgent.BOBuildBarracks not in self.next_build_step:
+        self.next_build_step.insert(0, ScriptedBuildAgent.BOBuildBarracks)
+        self.num_barracks += 1
+
+      # (4) keep building marines
+      if self.num_barracks > 0 and self.food_used + 2 < self.food_cap and self.minerals > 50 and ScriptedBuildAgent.BOBuildMarine not in self.next_build_step:
+        self.next_build_step.insert(0, ScriptedBuildAgent.BOBuildMarine)
+
+      # (5) if you have 30+ marines, take them and attack
+      if self.army_count > 30 and ScriptedBuildAgent.AttackWithMarine not in self.next_build_step:
+        self.next_build_step.insert(0, ScriptedBuildAgent.AttackWithMarine)
+
+    return self.next_build_step[0]
+
   def RemoveBuildStep(self):
-    self.build_order.pop(0)
+    if len(self.next_build_step) > 1:
+      self.next_build_step.pop(0)
 
   def step(self, obs):
     super(ScriptedBuildAgent, self).step(obs)
     self.obs = obs
-    time.sleep(0.02)
     success, function_id, args = False, ActionEnum.NoOp.value, []
 
     possible_actions = self.GetAvailableActions()
     self.LogAndUpdateAvailableActions(possible_actions)
 
-    # if self.steps % 100 != 0:
-    #   return actions.FunctionCall(function_id, args)
+    self.UpdateCounts()
 
     next_build_step = self.GetNextBuildStep()
     if not next_build_step:
       return actions.FunctionCall(function_id, args)
 
-    if self.rem_build_steps != len(self.build_order):
-      self.rem_build_steps = len(self.build_order)
-
     success, function_id, args = next_build_step(self)
     if function_id != ActionEnum.NoOp.value:
-      self.Log('Chose ' + self.ActionToString(function_id) + ' ' + str(args))
+      self.Log('Chose ' + self.ActionToString(function_id) + ' ' + str(args) + ' success: ' + str(success))
     if success:
       self.RemoveBuildStep()
       self.Log('Working on ' + str(self.GetNextBuildStep()))
 
+    # (0, 0) is top left of the mini map
+    if not self.player_y or not self.player_x:
+      player_y, player_x = (obs.observation['minimap'][features.SCREEN_FEATURES.player_relative.index] == _PLAYER_SELF).nonzero()
+      self.player_y, self.player_x = player_y.mean(), player_x.mean()
+      self.Log('x_mean: ' + str(self.player_x) + ' y_mean: ' + str(self.player_y))
+
     return actions.FunctionCall(function_id, args)
+
+  def UpdateCounts(self):
+    # obs.player_common.player_id,
+    # obs.player_common.minerals,
+    # obs.player_common.vespene,
+    # obs.player_common.food_used,
+    # obs.player_common.food_cap,
+    # obs.player_common.food_army,
+    # obs.player_common.food_workers,
+    # obs.player_common.idle_worker_count,
+    # obs.player_common.army_count,
+    # obs.player_common.warp_gate_count,
+    # obs.player_common.larva_count,
+    player_layer = self.obs.observation['player']
+
+    self.minerals = player_layer[1]
+    self.food_used = player_layer[3]
+    self.food_cap = player_layer[4]
+    self.worker_count = player_layer[6]
+    self.army_count = player_layer[8]
+
+    # self.Log('Pop: ' + str(self.food_used) + ' PopLimit: ' + str(self.food_cap) + ' Ratio: ' + str(self.food_used/self.food_cap) + ' SCV: ' + str(self.worker_count) + ' Army: ' + str(self.army_count))
 
   def LogPrefix(self):
     return '[' + str(self.steps) + ' ' + str(self.reward) + ']'
