@@ -36,7 +36,7 @@ _BARRACKS_MINERALS = 150
 # Min# of units to have available
 _MAX_SCVS = 20
 _MAX_BARRACKS = 10
-_MIN_MARINES_BEFORE_ATTACK = 30
+_MIN_MARINES_BEFORE_ATTACK = 20
 
 class ScriptedBuildAgent(base_agent.BaseAgent):
   def __init__(self):
@@ -52,6 +52,9 @@ class ScriptedBuildAgent(base_agent.BaseAgent):
     # flags for state, restructure this
     self.selected_cc, self.selected_scv, self.selected_barracks, self.selected_marine, \
     self.camera_on_base = False, False, False, False, False
+
+    self.last_harvest_steps = 0
+    self.last_camera_move = 0
 
     # Build order is implemented as a stack
     # We push to top when we decide to pursue a strategy
@@ -72,6 +75,8 @@ class ScriptedBuildAgent(base_agent.BaseAgent):
       self.all_locations_to_explore.append([min_increment, i])
       self.all_locations_to_explore.append([_MAP_RESOLUTION - min_increment, i])
     self.locations_to_explore = self.all_locations_to_explore
+
+    self.Random = numpy.random.randint
 
   def CCSelected(self):
     actions = self.GetAvailableActions()
@@ -104,7 +109,8 @@ class ScriptedBuildAgent(base_agent.BaseAgent):
 
     function_id = ActionEnum.NoOp.value
     args = []
-    if ActionEnum.MoveCamera.value in actions and not self.camera_on_base:
+    if self.steps - self.last_camera_move > 200 and ActionEnum.MoveCamera.value in actions and not self.camera_on_base:
+      self.last_camera_move = self.steps
       function_id = ActionEnum.MoveCamera.value
       args = [[self.player_x, self.player_y]]
       self.camera_on_base = True
@@ -116,11 +122,14 @@ class ScriptedBuildAgent(base_agent.BaseAgent):
 
     function_id = ActionEnum.NoOp.value
     args = []
-    if ActionEnum.MoveCamera.value in actions and self.camera_on_base:
+    if self.steps - self.last_camera_move > 200 and ActionEnum.MoveCamera.value in actions and self.camera_on_base:
+      self.last_camera_move = self.steps
       marines_x, marines_y = self.FindUnitLocationOnScreen(UnitEnum.TERRAN_MARINE.value)
       if len(marines_x) > 0 and len(marines_y) > 0:
         function_id = ActionEnum.MoveCamera.value
         args = [[int(marines_x.mean()), int(marines_y.mean())]]
+        if self.Random(100) < 50:
+          args = [self.FindEnemyLocationOnMap()]
         self.camera_on_base = False
 
     return False, function_id, args
@@ -146,7 +155,7 @@ class ScriptedBuildAgent(base_agent.BaseAgent):
         return self.BOBuildSCV()
 
       # Randomly pick an SCV and make him work
-      picked_scv_index = numpy.random.randint(len(scv_indices[0]))
+      picked_scv_index = self.Random(len(scv_indices[0]))
       args = [_NOT_QUEUED, [scv_indices[0][picked_scv_index], scv_indices[1][picked_scv_index]]]
 
       function_id = ActionEnum.SelectPoint.value
@@ -190,7 +199,7 @@ class ScriptedBuildAgent(base_agent.BaseAgent):
         # TODO check if need to move screen
         return False, function_id, args
 
-      picked_scv_index = numpy.random.randint(len(scv_indices[0]))
+      picked_scv_index = self.Random(len(scv_indices[0]))
       args = [_NOT_QUEUED, [scv_indices[0][picked_scv_index], scv_indices[1][picked_scv_index]]]
 
       function_id = ActionEnum.SelectPoint.value
@@ -265,12 +274,27 @@ class ScriptedBuildAgent(base_agent.BaseAgent):
         for minerals in [UnitEnum.NEUTRAL_BATTLESTATIONMINERALFIELD.value, UnitEnum.NEUTRAL_BATTLESTATIONMINERALFIELD750.value, UnitEnum.NEUTRAL_LABMINERALFIELD.value, UnitEnum.NEUTRAL_LABMINERALFIELD750.value, UnitEnum.NEUTRAL_MINERALFIELD.value, UnitEnum.NEUTRAL_MINERALFIELD750.value, UnitEnum.NEUTRAL_PURIFIERMINERALFIELD.value, UnitEnum.NEUTRAL_PURIFIERMINERALFIELD750.value, UnitEnum.NEUTRAL_PURIFIERRICHMINERALFIELD.value, UnitEnum.NEUTRAL_PURIFIERRICHMINERALFIELD750.value, UnitEnum.NEUTRAL_RICHMINERALFIELD.value, UnitEnum.NEUTRAL_RICHMINERALFIELD750.value]:
           mineral_x, mineral_y = self.FindUnitLocationOnScreen(minerals)
           if len(mineral_x) > 1 and len(mineral_y) > 1:
-            index = numpy.random.randint(0, len(mineral_x))
+            index = self.Random(0, len(mineral_x))
             function_id = ActionEnum.Harvest.value
             args = [_NOT_QUEUED, [mineral_x[index], mineral_y[index]]]
             return True, function_id, args
 
     return False, function_id, args
+
+  def SelectCCSingle(self):
+    function_id = ActionEnum.NoOp.value
+    args = []
+
+    cc_indices = self.FindUnitLocationOnScreen(UnitEnum.TERRAN_COMMANDCENTER.value)
+    if len(cc_indices) <= 0 or len(cc_indices[0]) <= 0 or len(cc_indices[1]) <= 0:
+      return True, function_id, args
+
+    r_i = self.Random(len(cc_indices[0]))
+    args = [_NOT_QUEUED, [cc_indices[0][r_i], cc_indices[1][r_i]]]
+
+    function_id = ActionEnum.SelectPoint.value
+
+    return True, function_id, args
 
   # build units
   def BOBuildSCV(self):
@@ -289,7 +313,7 @@ class ScriptedBuildAgent(base_agent.BaseAgent):
         # check if need to move screen
         return False, function_id, args
 
-      r_i = numpy.random.randint(len(cc_indices[0]))
+      r_i = self.Random(len(cc_indices[0]))
       args = [_NOT_QUEUED, [cc_indices[0][r_i], cc_indices[1][r_i]]]
 
       function_id = ActionEnum.SelectPoint.value
@@ -328,7 +352,7 @@ class ScriptedBuildAgent(base_agent.BaseAgent):
         # check if need to move screen
         return False, function_id, args
 
-      r_i = numpy.random.randint(len(cc_indices[0]))
+      r_i = self.Random(len(cc_indices[0]))
       args = [_NOT_QUEUED, [cc_indices[0][r_i], cc_indices[1][r_i]]]
 
       function_id = ActionEnum.SelectPoint.value
@@ -352,7 +376,10 @@ class ScriptedBuildAgent(base_agent.BaseAgent):
   def FindEnemyLocationOnMap(self):
     enemy_y, enemy_x = (self.GetFeaturesLayer('minimap', features.SCREEN_FEATURES.player_relative.index) == _PLAYER_HOSTILE).nonzero()
     if enemy_x.any() and enemy_y.any():
-      return [enemy_x.mean(), enemy_y.mean()]
+      if self.Random(100) < 50:
+        return [enemy_x[0], enemy_y[0]]
+      else:
+        return [enemy_x.mean(), enemy_y.mean()]
 
     return self.locations_to_explore[self.next_location]
 
@@ -360,7 +387,7 @@ class ScriptedBuildAgent(base_agent.BaseAgent):
     unit_type_screen_feature = self.GetFeaturesLayer('screen', features.SCREEN_FEATURES.unit_type.index)
     for pivot_y in range(radius, _MAP_RESOLUTION-radius):
       for pivot_x in range(radius, _MAP_RESOLUTION-radius):
-        pivot_x, pivot_y = numpy.random.randint(radius, _MAP_RESOLUTION-radius, size=2)
+        pivot_x, pivot_y = self.Random(radius, _MAP_RESOLUTION-radius, size=2)
         sub_matrix = unit_type_screen_feature[pivot_y-radius:pivot_y+radius, pivot_x-radius:pivot_x+radius]
         if (sub_matrix == UnitEnum.INVALID.value).all():
           return pivot_x, pivot_y
@@ -396,6 +423,11 @@ class ScriptedBuildAgent(base_agent.BaseAgent):
     if len(self.next_build_step) <= 1:
       # empty, check what we should do next, rules:
 
+      # (0) if more than one SCV idle, rally it back to minerals
+      if self.idle_worker > 1 and self.steps - self.last_harvest_steps > 2000 and ScriptedBuildAgent.HarvestWithSCV not in self.next_build_step:
+        self.next_build_step.insert(0, ScriptedBuildAgent.HarvestWithSCV)
+        self.last_harvest_steps = self.steps
+
       # (1) if population nearing cap, build supply depot
       if self.food_used / self.food_cap > _MAX_POPULATION_RATIO and self.minerals > _SUPPLY_MINERALS and ScriptedBuildAgent.BOBuildSupplyDepot not in self.next_build_step:
         self.next_build_step.insert(0, ScriptedBuildAgent.BOBuildSupplyDepot)
@@ -410,16 +442,15 @@ class ScriptedBuildAgent(base_agent.BaseAgent):
         self.num_barracks += 1
 
       # (4) keep building marines
-      if self.num_barracks > 0 and self.food_used + 2 < self.food_cap and self.minerals > 3 * _MARINE_MINERALS and ScriptedBuildAgent.BOBuildMarine not in self.next_build_step:
+      if self.num_barracks > 0 and self.food_used + 3 < self.food_cap and self.minerals > 3 * _MARINE_MINERALS and ScriptedBuildAgent.BOBuildMarine not in self.next_build_step:
         self.next_build_step.insert(0, ScriptedBuildAgent.BOBuildMarine)
+        self.next_build_step.insert(0, ScriptedBuildAgent.BOBuildMarine)
+        self.next_build_step.insert(0, ScriptedBuildAgent.BOBuildMarine)
+        self.next_build_step.insert(0, ScriptedBuildAgent.SelectCCSingle)
 
       # (5) if you have 30+ marines, take them and attack
       if self.army_count > _MIN_MARINES_BEFORE_ATTACK and ScriptedBuildAgent.AttackWithMarine not in self.next_build_step:
         self.next_build_step.insert(0, ScriptedBuildAgent.AttackWithMarine)
-
-      # (0) if more than one SCV idle, rally it back to minerals
-      if self.idle_worker > 1 and ScriptedBuildAgent.HarvestWithSCV not in self.next_build_step:
-        self.next_build_step.insert(0, ScriptedBuildAgent.HarvestWithSCV)
 
     return self.next_build_step[0]
 
@@ -458,7 +489,7 @@ class ScriptedBuildAgent(base_agent.BaseAgent):
       self.locations_to_explore.pop(self.next_location)
       if len(self.locations_to_explore) < 1:
         self.locations_to_explore = list(self.all_locations_to_explore)
-      self.next_location = numpy.random.randint(0, len(self.locations_to_explore))
+      self.next_location = self.Random(0, len(self.locations_to_explore))
 
     return actions.FunctionCall(function_id, args)
 
